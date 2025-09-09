@@ -1,211 +1,127 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8">
   <title>Universal Translator Earbuds</title>
   <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;max-width:720px;margin:18px auto;padding:12px;}
-    h1{font-size:1.25rem;margin-bottom:6px}
-    button{font-size:1rem;padding:12px;border-radius:10px;border:1px solid #ddd;background:#0b84ff;color:white}
-    .controls{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
-    select,input,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;margin-top:6px}
-    .log{background:#f7f7f8;padding:10px;border-radius:8px;margin-top:10px;min-height:90px}
-    small{color:#555}
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f9f9f9;
+      padding: 20px;
+    }
+    button {
+      margin: 10px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #0078D7;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #005a9e;
+    }
+    textarea {
+      width: 80%;
+      height: 80px;
+      margin: 10px auto;
+      display: block;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    select {
+      padding: 8px;
+      margin: 10px;
+      font-size: 16px;
+    }
+    h2 {
+      color: #333;
+    }
   </style>
 </head>
 <body>
-  <h1>Universal Translator — Speak → Translate → Hear</h1>
-  <small>Use Chrome on Android for best results. Connect earbuds — translated speech will play into them.</small>
+  <h1>🎧 Universal Translator Earbuds</h1>
 
-  <div style="margin-top:12px">
-    <label>From language (auto-detect available):</label>
-    <select id="fromLang">
-      <option value="">auto</option>
-    </select>
+  <button onclick="startListening()">🎙️ Start Listening</button>
+  <button onclick="stopListening()">🛑 Stop</button>
 
-    <label style="margin-top:8px">To language:</label>
-    <select id="toLang"></select>
-  </div>
+  <h2>Recognized (source):</h2>
+  <textarea id="recognized" readonly></textarea>
 
-  <div class="controls">
-    <button id="startBtn">Start listening</button>
-    <button id="stopBtn" disabled>Stop</button>
-    <button id="playLast">Replay</button>
-  </div>
+  <h2>Choose Target Language:</h2>
+  <select id="targetLang">
+    <option value="hi">Hindi</option>
+    <option value="kn">Kannada</option>
+    <option value="es">Spanish</option>
+    <option value="fr">French</option>
+    <option value="de">German</option>
+    <option value="zh">Chinese</option>
+    <option value="ja">Japanese</option>
+    <option value="ar">Arabic</option>
+    <option value="ru">Russian</option>
+    <option value="en">English</option>
+  </select>
 
-  <label>Recognized (source):</label>
-  <div class="log" id="sourceText">—</div>
-
-  <label style="margin-top:8px">Translated text:</label>
-  <div class="log" id="translatedText">—</div>
+  <h2>Translated text:</h2>
+  <textarea id="translated" readonly></textarea>
 
   <script>
-  // === CONFIG ===
-  const TRANSLATE_API = "https://translate.astian.org/translate"; // LibreTranslate server
+    let recognition;
+    const recognizedText = document.getElementById("recognized");
+    const translatedText = document.getElementById("translated");
+    const targetLang = document.getElementById("targetLang");
 
-  // === Language list (100+ supported by LibreTranslate) ===
-  const languages = {
-    "af":"Afrikaans","am":"Amharic","ar":"Arabic","az":"Azerbaijani",
-    "be":"Belarusian","bg":"Bulgarian","bn":"Bengali","bs":"Bosnian",
-    "ca":"Catalan","ceb":"Cebuano","cs":"Czech","cy":"Welsh",
-    "da":"Danish","de":"German","el":"Greek","en":"English",
-    "eo":"Esperanto","es":"Spanish","et":"Estonian","eu":"Basque",
-    "fa":"Persian","fi":"Finnish","fr":"French","ga":"Irish",
-    "gd":"Scots Gaelic","gl":"Galician","gu":"Gujarati","ha":"Hausa",
-    "haw":"Hawaiian","he":"Hebrew","hi":"Hindi","hmn":"Hmong",
-    "hr":"Croatian","ht":"Haitian Creole","hu":"Hungarian","hy":"Armenian",
-    "id":"Indonesian","ig":"Igbo","is":"Icelandic","it":"Italian",
-    "ja":"Japanese","jv":"Javanese","ka":"Georgian","kk":"Kazakh",
-    "km":"Khmer","kn":"Kannada","ko":"Korean","ku":"Kurdish",
-    "ky":"Kyrgyz","la":"Latin","lb":"Luxembourgish","lo":"Lao",
-    "lt":"Lithuanian","lv":"Latvian","mg":"Malagasy","mi":"Maori",
-    "mk":"Macedonian","ml":"Malayalam","mn":"Mongolian","mr":"Marathi",
-    "ms":"Malay","mt":"Maltese","my":"Burmese","ne":"Nepali",
-    "nl":"Dutch","no":"Norwegian","ny":"Chichewa","pa":"Punjabi",
-    "pl":"Polish","ps":"Pashto","pt":"Portuguese","ro":"Romanian",
-    "ru":"Russian","rw":"Kinyarwanda","sd":"Sindhi","si":"Sinhala",
-    "sk":"Slovak","sl":"Slovenian","sm":"Samoan","sn":"Shona",
-    "so":"Somali","sq":"Albanian","sr":"Serbian","st":"Sesotho",
-    "su":"Sundanese","sv":"Swedish","sw":"Swahili","ta":"Tamil",
-    "te":"Telugu","tg":"Tajik","th":"Thai","tk":"Turkmen",
-    "tl":"Tagalog","tr":"Turkish","tt":"Tatar","ug":"Uyghur",
-    "uk":"Ukrainian","ur":"Urdu","uz":"Uzbek","vi":"Vietnamese",
-    "xh":"Xhosa","yi":"Yiddish","yo":"Yoruba","zh":"Chinese",
-    "zu":"Zulu"
-  };
-
-  // === populate dropdowns ===
-  function populateLangs() {
-    const fromSel = document.getElementById('fromLang');
-    const toSel = document.getElementById('toLang');
-    for (const [code, name] of Object.entries(languages)) {
-      const opt1 = new Option(name, code);
-      const opt2 = new Option(name, code);
-      toSel.add(opt2);
-      fromSel.add(opt1);
-    }
-    fromSel.value = "";
-    toSel.value = "hi"; // default English -> Hindi
-  }
-  populateLangs();
-
-  // === UI refs ===
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const playLast = document.getElementById('playLast');
-  const sourceDiv = document.getElementById('sourceText');
-  const translatedDiv = document.getElementById('translatedText');
-  const fromLangSelect = document.getElementById('fromLang');
-  const toLangSelect = document.getElementById('toLang');
-
-  // === speech recognition ===
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recognition, lastTranslatedText = "";
-  if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.continuous = true;
-
-    recognition.onresult = async (event) => {
-      const last = event.results[event.results.length - 1];
-      const text = last[0].transcript.trim();
-      sourceDiv.innerText = text;
-      await translateAndSpeak(text);
-    };
-
-    recognition.onerror = (ev) => {
-      sourceDiv.innerText = "Mic error: " + ev.error;
-    };
-
-    recognition.onend = () => {
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-    };
-  } else {
-    sourceDiv.innerText = "SpeechRecognition not supported in this browser.";
-    startBtn.disabled = true;
-  }
-
-  // === translation function ===
-  async function translateText(text, from, to) {
-    const body = {
-      q: text,
-      source: from || "auto",
-      target: to,
-      format: "text",
-      api_key: ""   // required even if empty
-    };
-    const res = await fetch(TRANSLATE_API, {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error("Translate API error: " + res.status);
-    const data = await res.json();
-    return data.translatedText;
-  }
-
-  // === text-to-speech ===
-  function speakText(text, lang) {
-    return new Promise((resolve) => {
-      if (!window.speechSynthesis) return resolve();
-      const utter = new SpeechSynthesisUtterance(text);
-      const voices = window.speechSynthesis.getVoices();
-      let v = voices.find(x => x.lang && x.lang.startsWith(lang)) || voices[0];
-      if (v) utter.voice = v;
-      utter.onend = () => resolve();
-      utter.onerror = () => resolve();
-      window.speechSynthesis.speak(utter);
-    });
-  }
-
-  async function translateAndSpeak(text) {
-    try {
-      const from = fromLangSelect.value || "";
-      const to = toLangSelect.value || "en";
-      translatedDiv.innerText = "Translating...";
-      const translated = await translateText(text, from, to);
-      lastTranslatedText = translated;
-      translatedDiv.innerText = translated;
-      await speakText(translated, to);
-    } catch (err) {
-      translatedDiv.innerText = "Translation failed: " + err.message;
-    }
-  }
-
-  // === UI events ===
-  startBtn.addEventListener('click', async () => {
-    try {
-      if (navigator.mediaDevices) {
-        await navigator.mediaDevices.getUserMedia({audio:true});
+    // 🎤 Start listening
+    function startListening() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert("Your browser doesn't support Speech Recognition.");
+        return;
       }
-    } catch (e) {
-      console.warn('Mic permission denied', e);
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = "en-US"; // Source language
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onresult = async function(event) {
+        const text = event.results[event.results.length - 1][0].transcript;
+        recognizedText.value = text;
+        translateText(text);
+      };
+
+      recognition.start();
     }
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-    sourceDiv.innerText = "Listening...";
-    recognition.start();
-  });
 
-  stopBtn.addEventListener('click', () => {
-    recognition.stop();
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    sourceDiv.innerText = "Stopped.";
-  });
-
-  playLast.addEventListener('click', async () => {
-    if (lastTranslatedText) {
-      await speakText(lastTranslatedText, toLangSelect.value || 'en');
+    // 🛑 Stop listening
+    function stopListening() {
+      if (recognition) recognition.stop();
     }
-  });
 
-  window.speechSynthesis.onvoiceschanged = () => {
-    console.log('voices loaded');
-  };
+    // 🌍 Translate text using LibreTranslate
+    async function translateText(text) {
+      try {
+        const res = await fetch("https://libretranslate.de/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            q: text,
+            source: "en", // source language (English here)
+            target: targetLang.value,
+            format: "text"
+          })
+        });
+
+        if (!res.ok) throw new Error("Translation failed");
+
+        const data = await res.json();
+        translatedText.value = data.translatedText;
+      } catch (err) {
+        translatedText.value = "⚠️ Translation failed: " + err.message;
+      }
+    }
   </script>
 </body>
 </html>
