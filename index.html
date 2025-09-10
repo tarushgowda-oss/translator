@@ -100,16 +100,19 @@
       if (recognition) recognition.stop();
     }
 
-    // 🌍 Translate text using LibreTranslate
+    // 🌍 Translate text using LibreTranslate (via Proxy)
     async function translateText(text) {
       try {
-        const res = await fetch("https://translate.argosopentech.com/translate", {
+        const proxyUrl = "https://api.allorigins.win/raw?url=" +
+          encodeURIComponent("https://libretranslate.de/translate");
+
+        const res = await fetch(proxyUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             q: text,
-            source: "en", // source language (English here)
-            target: targetLang.value,
+            source: "en", // input language (speech)
+            target: targetLang.value, // selected target
             format: "text"
           })
         });
